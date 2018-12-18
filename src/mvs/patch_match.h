@@ -183,6 +183,9 @@ class PatchMatch {
     // Input images for the photometric consistency term.
     std::vector<Image>* images = nullptr;
 
+    // Input segmented images.
+    std::vector<Image>* segmented_images = nullptr;
+
     // Input depth maps for the geometric consistency term.
     std::vector<DepthMap>* depth_maps = nullptr;
 
@@ -197,6 +200,7 @@ class PatchMatch {
   ~PatchMatch();
 
   // Check the options and the problem for validity.
+  ///TODO: check segmentated images height and width///
   void Check() const;
 
   // Run the patch match algorithm.

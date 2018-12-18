@@ -98,6 +98,8 @@ class PatchMatchCuda {
   std::unique_ptr<CudaArrayWrapper<uint8_t>> ref_image_device_;
   std::unique_ptr<CudaArrayWrapper<uint8_t>> src_images_device_;
   std::unique_ptr<CudaArrayWrapper<float>> src_depth_maps_device_;
+  std::unique_ptr<CudaArrayWrapper<uint8_t>> ref_segmented_image_device_;
+  std::unique_ptr<CudaArrayWrapper<uint8_t>> src_segmented_images_device_;
 
   // Relative poses from rotated versions of reference image to source images
   // corresponding to _rotationInHalfPi:
@@ -122,6 +124,7 @@ class PatchMatchCuda {
 
   // Data for reference image.
   std::unique_ptr<GpuMatRefImage> ref_image_;
+  std::unique_ptr<GpuMatRefImage> ref_segmented_image_;
   std::unique_ptr<GpuMat<float>> depth_map_;
   std::unique_ptr<GpuMat<float>> normal_map_;
   std::unique_ptr<GpuMat<float>> sel_prob_map_;

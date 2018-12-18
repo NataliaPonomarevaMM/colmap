@@ -58,8 +58,12 @@ namespace mvs {
 
 texture<uint8_t, cudaTextureType2D, cudaReadModeNormalizedFloat>
     ref_image_texture;
+texture<uint8_t, cudaTextureType2D, cudaReadModeNormalizedFloat>
+    ref_segmented_image_texture;
 texture<uint8_t, cudaTextureType2DLayered, cudaReadModeNormalizedFloat>
     src_images_texture;
+texture<uint8_t, cudaTextureType2DLayered, cudaReadModeNormalizedFloat>
+    src_segmented_images_texture;
 texture<float, cudaTextureType2DLayered, cudaReadModeElementType>
     src_depth_maps_texture;
 texture<float, cudaTextureType2D, cudaReadModeElementType> poses_texture;
@@ -329,6 +333,8 @@ struct PhotoConsistencyCostComputer {
 
   // Image data in local window around patch.
   const float* local_ref_image = nullptr;
+  // Segmented image data in local window around patch.
+  const float* local_ref_segmented_image = nullptr;
 
   // Precomputed sum of raw and squared image intensities.
   float local_ref_sum = 0.0f;
@@ -371,6 +377,19 @@ struct PhotoConsistencyCostComputer {
     const float ref_center_color =
         local_ref_image[ref_image_idx + kWindowRadius * 3 * THREADS_PER_BLOCK +
                         kWindowRadius];
+    const float ref_segmented_center_color =
+            local_ref_segmented_image[ref_image_idx + kWindowRadius * 3 * THREADS_PER_BLOCK +
+                            kWindowRadius];
+    // Found center on source image
+    const float m_col_src = col_src + (tform[1] + tform[0]) * kWindowRadius;
+    const float m_row_src = row_src + (tform[4] + tform[3]) * kWindowRadius;
+    const float m_z = z + (tform[6] + tform[7]) * kWindowRadius;
+    const float m_inv_z = 1.0f / m_z;
+    const float m_norm_col_src = m_inv_z * m_col_src + 0.5f;
+    const float m_norm_row_src = m_inv_z * m_row_src + 0.5f;
+    const float src_segmented_center_color = tex2DLayered(src_segmented_images_texture, m_norm_col_src,
+            m_norm_row_src, src_image_idx);
+
     const float ref_color_sum = local_ref_sum;
     const float ref_color_squared_sum = local_ref_squared_sum;
     float src_color_sum = 0.0f;
@@ -387,15 +406,23 @@ struct PhotoConsistencyCostComputer {
         const float src_color = tex2DLayered(src_images_texture, norm_col_src,
                                              norm_row_src, src_image_idx);
 
-        const float bilateral_weight = bilateral_weight_computer_.Compute(
-            row, col, ref_center_color, ref_color);
+        const float ref_segmented_color = local_ref_segmented_image[ref_image_idx];
+        const float src_segmented_color = tex2DLayered(src_segmented_images_texture, norm_col_src,
+                                             norm_row_src, src_image_idx);
 
-        const float bilateral_weight_src = bilateral_weight * src_color;
+        if (ref_segmented_color == ref_segmented_center_color &&
+            src_segmented_color == src_segmented_center_color) {
 
-        src_color_sum += bilateral_weight_src;
-        src_color_squared_sum += bilateral_weight_src * src_color;
-        src_ref_color_sum += bilateral_weight_src * ref_color;
-        bilateral_weight_sum += bilateral_weight;
+          const float bilateral_weight = bilateral_weight_computer_.Compute(
+                  row, col, ref_center_color, ref_color);
+
+          const float bilateral_weight_src = bilateral_weight * src_color;
+
+          src_color_sum += bilateral_weight_src;
+          src_color_squared_sum += bilateral_weight_src * src_color;
+          src_ref_color_sum += bilateral_weight_src * ref_color;
+          bilateral_weight_sum += bilateral_weight;
+        }
 
         ref_image_idx += kWindowStep;
 
@@ -531,7 +558,8 @@ template <int kWindowSize>
 __device__ inline void ReadRefImageIntoSharedMemory(float* local_image,
                                                     const int row,
                                                     const int col,
-                                                    const int thread_id) {
+                                                    const int thread_id,
+                                                    bool is_segmented) {
   // For the first row, read the entire block into shared memory. For all
   // consecutive rows, it is only necessary to shift the rows in shared memory
   // up by one element and then read in a new row at the bottom of the shared
@@ -544,8 +572,8 @@ __device__ inline void ReadRefImageIntoSharedMemory(float* local_image,
       int c = col - THREADS_PER_BLOCK;
 #pragma unroll
       for (int j = 0; j < 3; ++j) {
-        local_image[thread_id + i * 3 * THREADS_PER_BLOCK +
-                    j * THREADS_PER_BLOCK] = tex2D(ref_image_texture, c, r);
+        local_image[thread_id + i * 3 * THREADS_PER_BLOCK + j * THREADS_PER_BLOCK] =
+                tex2D(!is_segmented ? ref_image_texture : ref_segmented_image_texture, c, r);
         c += THREADS_PER_BLOCK;
       }
       r += 1;
@@ -568,8 +596,8 @@ __device__ inline void ReadRefImageIntoSharedMemory(float* local_image,
     const int i = kWindowSize - 1;
 #pragma unroll
     for (int j = 0; j < 3; ++j) {
-      local_image[thread_id + i * 3 * THREADS_PER_BLOCK +
-                  j * THREADS_PER_BLOCK] = tex2D(ref_image_texture, c, r);
+      local_image[thread_id + i * 3 * THREADS_PER_BLOCK + j * THREADS_PER_BLOCK] =
+              tex2D(!is_segmented ? ref_image_texture : ref_segmented_image_texture, c, r);
       c += THREADS_PER_BLOCK;
     }
   }
@@ -769,10 +797,12 @@ __global__ void ComputeInitialCost(GpuMat<float> cost_map,
   const int col = blockDim.x * blockIdx.x + threadIdx.x;
 
   __shared__ float local_ref_image[THREADS_PER_BLOCK * 3 * kWindowSize];
+  __shared__ float local_ref_segmented_image[THREADS_PER_BLOCK * 3 * kWindowSize];
 
   PhotoConsistencyCostComputer<kWindowSize, kWindowStep> pcc_computer(
       sigma_spatial, sigma_color);
   pcc_computer.local_ref_image = local_ref_image;
+  pcc_computer.local_ref_segmented_image = local_ref_segmented_image;
   pcc_computer.row = 0;
   pcc_computer.col = col;
 
@@ -783,7 +813,9 @@ __global__ void ComputeInitialCost(GpuMat<float> cost_map,
     // Note that this must be executed even for pixels outside the borders,
     // since pixels are used in the local neighborhood of the current pixel.
     ReadRefImageIntoSharedMemory<kWindowSize>(local_ref_image, row, col,
-                                              thread_id);
+                                              thread_id, false);
+    ReadRefImageIntoSharedMemory<kWindowSize>(local_ref_segmented_image, row, col,
+                                              thread_id, true);
 
     if (col < cost_map.GetWidth()) {
       pcc_computer.depth = depth_map.Get(row, col);
@@ -877,10 +909,13 @@ __global__ void SweepFromTopToBottom(
   // one warp for NCC computation. Note that this limits the maximum window
   // size to 2 * THREADS_PER_BLOCK + 1.
   __shared__ float local_ref_image[THREADS_PER_BLOCK * 3 * kWindowSize];
+  __shared__ float local_ref_segmented_image[THREADS_PER_BLOCK * 3 * kWindowSize];
+
 
   PhotoConsistencyCostComputer<kWindowSize, kWindowStep> pcc_computer(
       options.sigma_spatial, options.sigma_color);
   pcc_computer.local_ref_image = local_ref_image;
+  pcc_computer.local_ref_segmented_image = local_ref_segmented_image;
   pcc_computer.col = col;
 
   struct ParamState {
@@ -909,7 +944,9 @@ __global__ void SweepFromTopToBottom(
     // Note that this must be executed even for pixels outside the borders,
     // since pixels are used in the local neighborhood of the current pixel.
     ReadRefImageIntoSharedMemory<kWindowSize>(local_ref_image, row, col,
-                                              thread_id);
+                                              thread_id, false);
+    ReadRefImageIntoSharedMemory<kWindowSize>(local_ref_segmented_image, row, col,
+                                              thread_id, true);
 
     if (col >= cost_map.GetWidth()) {
       continue;
@@ -1389,6 +1426,7 @@ void PatchMatchCuda::ComputeCudaConfig() {
 
 void PatchMatchCuda::InitRefImage() {
   const Image& ref_image = problem_.images->at(problem_.ref_image_idx);
+  const Image& ref_segmented_image = problem_.segmented_images->at(problem_.ref_image_idx);
 
   ref_width_ = ref_image.GetWidth();
   ref_height_ = ref_image.GetHeight();
@@ -1400,10 +1438,21 @@ void PatchMatchCuda::InitRefImage() {
   ref_image_->Filter(ref_image_array.data(), options_.window_radius,
                      options_.window_step, options_.sigma_spatial,
                      options_.sigma_color);
-
   ref_image_device_.reset(
-      new CudaArrayWrapper<uint8_t>(ref_width_, ref_height_, 1));
+        new CudaArrayWrapper<uint8_t>(ref_width_, ref_height_, 1));
   ref_image_device_->CopyFromGpuMat(*ref_image_->image);
+
+  // Upload segmentated image
+  ref_segmented_image_.reset(new GpuMatRefImage(ref_width_, ref_height_));
+  const std::vector<uint8_t> ref_segmented_image_array =
+          ref_segmented_image.GetBitmap().ConvertToRowMajorArray();
+  ref_segmented_image_->Filter(ref_segmented_image_array.data(), options_.window_radius,
+                     options_.window_step, options_.sigma_spatial,
+                     options_.sigma_color);
+  ref_segmented_image_device_.reset(
+          new CudaArrayWrapper<uint8_t>(ref_width_, ref_height_, 1));
+  ref_segmented_image_device_->CopyFromGpuMat(*ref_segmented_image_->image);
+
 
   // Create texture.
   ref_image_texture.addressMode[0] = cudaAddressModeBorder;
@@ -1413,6 +1462,15 @@ void PatchMatchCuda::InitRefImage() {
   ref_image_texture.normalized = false;
   CUDA_SAFE_CALL(
       cudaBindTextureToArray(ref_image_texture, ref_image_device_->GetPtr()));
+
+  // Create texture for segmented image.
+  ref_segmented_image_texture.addressMode[0] = cudaAddressModeBorder;
+  ref_segmented_image_texture.addressMode[1] = cudaAddressModeBorder;
+  ref_segmented_image_texture.addressMode[2] = cudaAddressModeBorder;
+  ref_segmented_image_texture.filterMode = cudaFilterModePoint;
+  ref_segmented_image_texture.normalized = false;
+  CUDA_SAFE_CALL(
+          cudaBindTextureToArray(ref_segmented_image_texture, ref_segmented_image_device_->GetPtr()));
 }
 
 void PatchMatchCuda::InitSourceImages() {
@@ -1437,12 +1495,23 @@ void PatchMatchCuda::InitSourceImages() {
         static_cast<size_t>(max_width * max_height *
                             problem_.src_image_idxs.size()),
         kDefaultValue);
+    std::vector<uint8_t> src_segmented_images_host_data(
+            static_cast<size_t>(max_width * max_height *
+                                problem_.src_image_idxs.size()),
+            kDefaultValue);
     for (size_t i = 0; i < problem_.src_image_idxs.size(); ++i) {
       const Image& image = problem_.images->at(problem_.src_image_idxs[i]);
       const Bitmap& bitmap = image.GetBitmap();
       uint8_t* dest = src_images_host_data.data() + max_width * max_height * i;
       for (size_t r = 0; r < image.GetHeight(); ++r) {
         memcpy(dest, bitmap.GetScanline(r), image.GetWidth() * sizeof(uint8_t));
+        dest += max_width;
+      }
+      const Image& segmented_image = problem_.segmented_images->at(problem_.src_image_idxs[i]);
+      const Bitmap& segmented_bitmap = image.GetBitmap();
+      uint8_t* segmented_dest = src_segmented_images_host_data.data() + max_width * max_height * i;
+      for (size_t r = 0; r < segmented_image.GetHeight(); ++r) {
+        memcpy(segmented_dest, segmented_bitmap.GetScanline(r), segmented_image.GetWidth() * sizeof(uint8_t));
         dest += max_width;
       }
     }
@@ -1452,6 +1521,11 @@ void PatchMatchCuda::InitSourceImages() {
         max_width, max_height, problem_.src_image_idxs.size()));
     src_images_device_->CopyToDevice(src_images_host_data.data());
 
+    // Upload segmented images to device.
+    src_segmented_images_device_.reset(new CudaArrayWrapper<uint8_t>(
+            max_width, max_height, problem_.src_image_idxs.size()));
+    src_segmented_images_device_->CopyToDevice(src_segmented_images_host_data.data());
+
     // Create source images texture.
     src_images_texture.addressMode[0] = cudaAddressModeBorder;
     src_images_texture.addressMode[1] = cudaAddressModeBorder;
@@ -1460,6 +1534,15 @@ void PatchMatchCuda::InitSourceImages() {
     src_images_texture.normalized = false;
     CUDA_SAFE_CALL(cudaBindTextureToArray(src_images_texture,
                                           src_images_device_->GetPtr()));
+
+    // Create segmented source images texture.
+    src_segmented_images_texture.addressMode[0] = cudaAddressModeBorder;
+    src_segmented_images_texture.addressMode[1] = cudaAddressModeBorder;
+    src_segmented_images_texture.addressMode[2] = cudaAddressModeBorder;
+    src_segmented_images_texture.filterMode = cudaFilterModeLinear;
+    src_segmented_images_texture.normalized = false;
+    CUDA_SAFE_CALL(cudaBindTextureToArray(src_segmented_images_texture,
+                                          src_segmented_images_device_->GetPtr()));
   }
 
   // Upload source depth maps to device.
@@ -1706,12 +1789,27 @@ void PatchMatchCuda::Rotate() {
     ref_image_.swap(rotated_ref_image);
   }
 
+  // Rotate segmented reference image.
+  {
+    std::unique_ptr<GpuMatRefImage> rotated_ref_segmented_image(
+            new GpuMatRefImage(width, height));
+    ref_segmented_image_->image->Rotate(rotated_ref_segmented_image->image.get());
+    ref_segmented_image_.swap(rotated_ref_segmented_image);
+  }
+
   // Bind rotated reference image to texture.
   ref_image_device_.reset(new CudaArrayWrapper<uint8_t>(width, height, 1));
   ref_image_device_->CopyFromGpuMat(*ref_image_->image);
   CUDA_SAFE_CALL(cudaUnbindTexture(ref_image_texture));
   CUDA_SAFE_CALL(
       cudaBindTextureToArray(ref_image_texture, ref_image_device_->GetPtr()));
+
+  // Bind rotated reference segmented image to texture.
+  ref_segmented_image_device_.reset(new CudaArrayWrapper<uint8_t>(width, height, 1));
+  ref_segmented_image_device_->CopyFromGpuMat(*ref_segmented_image_->image);
+  CUDA_SAFE_CALL(cudaUnbindTexture(ref_segmented_image_texture));
+  CUDA_SAFE_CALL(
+          cudaBindTextureToArray(ref_segmented_image_texture, ref_segmented_image_device_->GetPtr()));
 
   // Rotate selection probability map.
   prev_sel_prob_map_.reset(
