@@ -67,6 +67,7 @@ void Model::ReadFromCOLMAP(const std::string& path) {
     CHECK_EQ(camera.ModelId(), PinholeCameraModel::model_id);
 
     const std::string image_path = JoinPaths(path, "images", image.Name());
+    const std::string segmented_image_path = JoinPaths(path, "segmented_images", image.Name());
     const Eigen::Matrix<float, 3, 3, Eigen::RowMajor> K =
         camera.CalibrationMatrix().cast<float>();
     const Eigen::Matrix<float, 3, 3, Eigen::RowMajor> R =
@@ -74,7 +75,7 @@ void Model::ReadFromCOLMAP(const std::string& path) {
     const Eigen::Vector3f T = image.Tvec().cast<float>();
 
     images.emplace_back(image_path, camera.Width(), camera.Height(), K.data(),
-                        R.data(), T.data());
+                        R.data(), T.data(), segmented_image_path);
     image_id_to_idx.emplace(image_id, i);
     image_names_.push_back(image.Name());
     image_name_to_idx_.emplace(image.Name(), i);
@@ -294,6 +295,7 @@ bool Model::ReadFromBundlerPMVS(const std::string& path) {
   for (int image_idx = 0; image_idx < num_images; ++image_idx) {
     const std::string image_name = StringPrintf("%08d.jpg", image_idx);
     const std::string image_path = JoinPaths(path, "visualize", image_name);
+      const std::string segmented_image_path = JoinPaths(path, "segmented_images", image_name);
 
     float K[9] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
     file >> K[0];
@@ -322,7 +324,7 @@ bool Model::ReadFromBundlerPMVS(const std::string& path) {
     T[1] = -T[1];
     T[2] = -T[2];
 
-    images.emplace_back(image_path, bitmap.Width(), bitmap.Height(), K, R, T);
+    images.emplace_back(image_path, bitmap.Width(), bitmap.Height(), K, R, T, segmented_image_path);
     image_names_.push_back(image_name);
     image_name_to_idx_.emplace(image_name, image_idx);
   }
@@ -360,6 +362,7 @@ bool Model::ReadFromRawPMVS(const std::string& path) {
   for (int image_idx = 0;; ++image_idx) {
     const std::string image_name = StringPrintf("%08d.jpg", image_idx);
     const std::string image_path = JoinPaths(path, "visualize", image_name);
+    const std::string segmented_image_path = JoinPaths(path, "segmented_images", image_name);
 
     if (!ExistsFile(image_path)) {
       break;
@@ -400,7 +403,7 @@ bool Model::ReadFromRawPMVS(const std::string& path) {
     const Eigen::Vector3f T_float = T.cast<float>();
 
     images.emplace_back(image_path, bitmap.Width(), bitmap.Height(),
-                        K_float.data(), R_float.data(), T_float.data());
+                        K_float.data(), R_float.data(), T_float.data(), segmented_image_path);
     image_names_.push_back(image_name);
     image_name_to_idx_.emplace(image_name, image_idx);
   }

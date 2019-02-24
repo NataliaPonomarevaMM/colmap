@@ -69,16 +69,19 @@ class Workspace {
 
   const Model& GetModel() const;
   const Bitmap& GetBitmap(const int image_idx);
+  const Bitmap& GetSegmentedBitmap(const int image_idx);
   const DepthMap& GetDepthMap(const int image_idx);
   const NormalMap& GetNormalMap(const int image_idx);
 
   // Get paths to bitmap, depth map, normal map and consistency graph.
   std::string GetBitmapPath(const int image_idx) const;
+  std::string GetSegmentedBitmapPath(const int image_idx) const;
   std::string GetDepthMapPath(const int image_idx) const;
   std::string GetNormalMapPath(const int image_idx) const;
 
   // Return whether bitmap, depth map, normal map, and consistency graph exist.
   bool HasBitmap(const int image_idx) const;
+  bool HasSegmentedBitmap(const int image_idx) const;
   bool HasDepthMap(const int image_idx) const;
   bool HasNormalMap(const int image_idx) const;
 
@@ -93,6 +96,7 @@ class Workspace {
     size_t NumBytes() const;
     size_t num_bytes = 0;
     std::unique_ptr<Bitmap> bitmap;
+    std::unique_ptr<Bitmap> segmented_bitmap;
     std::unique_ptr<DepthMap> depth_map;
     std::unique_ptr<NormalMap> normal_map;
 

@@ -1426,7 +1426,7 @@ void PatchMatchCuda::ComputeCudaConfig() {
 
 void PatchMatchCuda::InitRefImage() {
   const Image& ref_image = problem_.images->at(problem_.ref_image_idx);
-  const Image& ref_segmented_image = problem_.segmented_images->at(problem_.ref_image_idx);
+  const Bitmap& ref_segmented_bitmap = problem_.segmented_images->at(problem_.ref_image_idx);
 
   ref_width_ = ref_image.GetWidth();
   ref_height_ = ref_image.GetHeight();
@@ -1442,17 +1442,11 @@ void PatchMatchCuda::InitRefImage() {
         new CudaArrayWrapper<uint8_t>(ref_width_, ref_height_, 1));
   ref_image_device_->CopyFromGpuMat(*ref_image_->image);
 
-  // Upload segmentated image
-  ref_segmented_image_.reset(new GpuMatRefImage(ref_width_, ref_height_));
-  const std::vector<uint8_t> ref_segmented_image_array =
-          ref_segmented_image.GetBitmap().ConvertToRowMajorArray();
-  ref_segmented_image_->Filter(ref_segmented_image_array.data(), options_.window_radius,
-                     options_.window_step, options_.sigma_spatial,
-                     options_.sigma_color);
-  ref_segmented_image_device_.reset(
-          new CudaArrayWrapper<uint8_t>(ref_width_, ref_height_, 1));
-  ref_segmented_image_device_->CopyFromGpuMat(*ref_segmented_image_->image);
-
+  // Upload segmented image
+  ref_segmented_image_.reset(new GpuMat<uint8_t>(ref_width_, ref_height_));
+  ///TODO: FILL ref_segmented_image_ with ref_segmented_bitmap.ConvertToRowMajorArray()
+  ref_segmented_image_device_.reset(new CudaArrayWrapper<uint8_t>(ref_width_, ref_height_, 1));
+  ref_segmented_image_device_->CopyFromGpuMat(*ref_segmented_image_);
 
   // Create texture.
   ref_image_texture.addressMode[0] = cudaAddressModeBorder;
@@ -1503,16 +1497,14 @@ void PatchMatchCuda::InitSourceImages() {
       const Image& image = problem_.images->at(problem_.src_image_idxs[i]);
       const Bitmap& bitmap = image.GetBitmap();
       uint8_t* dest = src_images_host_data.data() + max_width * max_height * i;
+      const Bitmap& segmented_bitmap = problem_.segmented_images->at(problem_.src_image_idxs[i]);
+      uint8_t* segmented_dest = src_segmented_images_host_data.data() + max_width * max_height * i;
+
       for (size_t r = 0; r < image.GetHeight(); ++r) {
         memcpy(dest, bitmap.GetScanline(r), image.GetWidth() * sizeof(uint8_t));
         dest += max_width;
-      }
-      const Image& segmented_image = problem_.segmented_images->at(problem_.src_image_idxs[i]);
-      const Bitmap& segmented_bitmap = image.GetBitmap();
-      uint8_t* segmented_dest = src_segmented_images_host_data.data() + max_width * max_height * i;
-      for (size_t r = 0; r < segmented_image.GetHeight(); ++r) {
-        memcpy(segmented_dest, segmented_bitmap.GetScanline(r), segmented_image.GetWidth() * sizeof(uint8_t));
-        dest += max_width;
+        memcpy(segmented_dest, segmented_bitmap.GetScanline(r), image.GetWidth() * sizeof(uint8_t));
+        segmented_dest += max_width;
       }
     }
 
@@ -1791,9 +1783,8 @@ void PatchMatchCuda::Rotate() {
 
   // Rotate segmented reference image.
   {
-    std::unique_ptr<GpuMatRefImage> rotated_ref_segmented_image(
-            new GpuMatRefImage(width, height));
-    ref_segmented_image_->image->Rotate(rotated_ref_segmented_image->image.get());
+    std::unique_ptr<GpuMat<uint8_t>> rotated_ref_segmented_image(new GpuMat<uint8_t>(width, height));
+    ref_segmented_image_->Rotate(rotated_ref_segmented_image.get());
     ref_segmented_image_.swap(rotated_ref_segmented_image);
   }
 
@@ -1806,7 +1797,7 @@ void PatchMatchCuda::Rotate() {
 
   // Bind rotated reference segmented image to texture.
   ref_segmented_image_device_.reset(new CudaArrayWrapper<uint8_t>(width, height, 1));
-  ref_segmented_image_device_->CopyFromGpuMat(*ref_segmented_image_->image);
+  ref_segmented_image_device_->CopyFromGpuMat(*ref_segmented_image_);
   CUDA_SAFE_CALL(cudaUnbindTexture(ref_segmented_image_texture));
   CUDA_SAFE_CALL(
           cudaBindTextureToArray(ref_segmented_image_texture, ref_segmented_image_device_->GetPtr()));

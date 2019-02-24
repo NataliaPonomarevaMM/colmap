@@ -48,7 +48,7 @@ class Image {
  public:
   Image();
   Image(const std::string& path, const size_t width, const size_t height,
-        const float* K, const float* R, const float* T);
+        const float* K, const float* R, const float* T, const std::string& segmented_path = "");
 
   inline size_t GetWidth() const;
   inline size_t GetHeight() const;
@@ -57,6 +57,7 @@ class Image {
   inline const Bitmap& GetBitmap() const;
 
   inline const std::string& GetPath() const;
+  inline const std::string& GetSegmentedPath() const;
   inline const float* GetR() const;
   inline const float* GetT() const;
   inline const float* GetK() const;
@@ -70,6 +71,7 @@ class Image {
 
  private:
   std::string path_;
+  std::string segmented_path_;
   size_t width_;
   size_t height_;
   float K_[9];
@@ -105,6 +107,8 @@ size_t Image::GetHeight() const { return height_; }
 const Bitmap& Image::GetBitmap() const { return bitmap_; }
 
 const std::string& Image::GetPath() const { return path_; }
+
+const std::string& Image::GetSegmentedPath() const { return segmented_path_; }
 
 const float* Image::GetR() const { return R_; }
 

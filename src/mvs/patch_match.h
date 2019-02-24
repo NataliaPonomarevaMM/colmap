@@ -184,7 +184,7 @@ class PatchMatch {
     std::vector<Image>* images = nullptr;
 
     // Input segmented images.
-    std::vector<Image>* segmented_images = nullptr;
+    std::vector<Bitmap>* segmented_images = nullptr;
 
     // Input depth maps for the geometric consistency term.
     std::vector<DepthMap>* depth_maps = nullptr;

@@ -124,7 +124,7 @@ class PatchMatchCuda {
 
   // Data for reference image.
   std::unique_ptr<GpuMatRefImage> ref_image_;
-  std::unique_ptr<GpuMatRefImage> ref_segmented_image_;
+  std::unique_ptr<GpuMat<uint8_t>> ref_segmented_image_;
   std::unique_ptr<GpuMat<float>> depth_map_;
   std::unique_ptr<GpuMat<float>> normal_map_;
   std::unique_ptr<GpuMat<float>> sel_prob_map_;

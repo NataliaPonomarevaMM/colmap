@@ -456,6 +456,7 @@ void PatchMatchController::ProcessProblem(const PatchMatchOptions& options,
   }
 
   std::vector<Image> images = model.images;
+  std::vector<Bitmap> segmented_images;
   std::vector<DepthMap> depth_maps;
   std::vector<NormalMap> normal_maps;
   if (options.geom_consistency) {
@@ -466,6 +467,7 @@ void PatchMatchController::ProcessProblem(const PatchMatchOptions& options,
   problem.images = &images;
   problem.depth_maps = &depth_maps;
   problem.normal_maps = &normal_maps;
+  problem.segmented_images = &segmented_images;
 
   {
     // Collect all used images in current problem.
@@ -484,6 +486,7 @@ void PatchMatchController::ProcessProblem(const PatchMatchOptions& options,
     std::cout << "Reading inputs..." << std::endl;
     for (const auto image_idx : used_image_idxs) {
       images.at(image_idx).SetBitmap(workspace_->GetBitmap(image_idx));
+      segmented_images.at(image_idx) = workspace_->GetSegmentedBitmap(image_idx);
       if (options.geom_consistency) {
         depth_maps.at(image_idx) = workspace_->GetDepthMap(image_idx);
         normal_maps.at(image_idx) = workspace_->GetNormalMap(image_idx);
