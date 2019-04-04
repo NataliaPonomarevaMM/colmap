@@ -137,6 +137,8 @@ struct PatchMatchOptions {
   // Whether to write the consistency graph.
   bool write_consistency_graph = false;
 
+  bool use_segmented_images = true;
+
   void Print() const;
   bool Check() const {
     if (depth_min != -1.0f || depth_max != -1.0f) {

@@ -74,6 +74,7 @@ void PatchMatchOptions::Print() const {
   PrintOption(filter_min_num_consistent);
   PrintOption(filter_geom_consistency_max_cost);
   PrintOption(write_consistency_graph);
+  PrintOption(use_segmented_images);
 }
 
 void PatchMatch::Problem::Print() const {
@@ -107,6 +108,9 @@ void PatchMatch::Check() const {
     CHECK_EQ(problem_.depth_maps->size(), problem_.images->size());
     CHECK_EQ(problem_.normal_maps->size(), problem_.images->size());
   }
+  if (options_.use_segmented_images) {
+    CHECK_NOTNULL(problem_.segmented_images);
+  }
 
   CHECK_GT(problem_.src_image_idxs.size(), 0);
 
@@ -128,6 +132,12 @@ void PatchMatch::Check() const {
     CHECK(image.GetBitmap().IsGrey()) << image_idx;
     CHECK_EQ(image.GetWidth(), image.GetBitmap().Width()) << image_idx;
     CHECK_EQ(image.GetHeight(), image.GetBitmap().Height()) << image_idx;
+
+    if (options_.use_segmented_images) {
+      const Bitmap& seg_image = problem_.segmented_images->at(image_idx);
+      CHECK_EQ(image.GetHeight(), seg_image.Height()) << image_idx;
+      CHECK_EQ(image.GetWidth(), seg_image.Width()) << image_idx;
+    }
 
     // Make sure, the calibration matrix only contains fx, fy, cx, cy.
     CHECK_LT(std::abs(image.GetK()[1] - 0.0f), 1e-6f) << image_idx;
@@ -486,7 +496,8 @@ void PatchMatchController::ProcessProblem(const PatchMatchOptions& options,
     std::cout << "Reading inputs..." << std::endl;
     for (const auto image_idx : used_image_idxs) {
       images.at(image_idx).SetBitmap(workspace_->GetBitmap(image_idx));
-      segmented_images.at(image_idx) = workspace_->GetSegmentedBitmap(image_idx);
+      if (options.use_segmented_images)
+        segmented_images.at(image_idx) = workspace_->GetSegmentedBitmap(image_idx);
       if (options.geom_consistency) {
         depth_maps.at(image_idx) = workspace_->GetDepthMap(image_idx);
         normal_maps.at(image_idx) = workspace_->GetNormalMap(image_idx);
