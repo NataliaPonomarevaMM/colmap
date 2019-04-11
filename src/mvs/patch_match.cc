@@ -501,8 +501,8 @@ void PatchMatchController::ProcessProblem(const PatchMatchOptions& options,
       std::cout << image_idx << std::endl;
       images.at(image_idx).SetBitmap(workspace_->GetBitmap(image_idx));
       if (options.use_segmented_images) {
-          segmented_images.at(image_idx) = workspace_->GetSegmentedBitmap(image_idx);
           std::cout << workspace_->GetSegmentedBitmapPath(image_idx) << std::endl;
+          segmented_images.at(image_idx) = workspace_->GetSegmentedBitmap(image_idx);
       }
       if (options.geom_consistency) {
         depth_maps.at(image_idx) = workspace_->GetDepthMap(image_idx);
