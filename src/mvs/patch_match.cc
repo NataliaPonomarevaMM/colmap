@@ -494,15 +494,21 @@ void PatchMatchController::ProcessProblem(const PatchMatchOptions& options,
     std::unique_lock<std::mutex> lock(workspace_mutex_);
 
     std::cout << "Reading inputs..." << std::endl;
+    std::cout << "To use segmented images: " << options.use_segmented_images << std::endl;
+    std::cout << "Used images: " << used_image_idxs.size() << std::endl;
+
     for (const auto image_idx : used_image_idxs) {
       images.at(image_idx).SetBitmap(workspace_->GetBitmap(image_idx));
-      if (options.use_segmented_images)
-        segmented_images.at(image_idx) = workspace_->GetSegmentedBitmap(image_idx);
+      if (options.use_segmented_images) {
+          segmented_images.at(image_idx) = workspace_->GetSegmentedBitmap(image_idx);
+          std::cout << workspace_->GetSegmentedBitmapPath(image_idx) << std::endl;
+      }
       if (options.geom_consistency) {
         depth_maps.at(image_idx) = workspace_->GetDepthMap(image_idx);
         normal_maps.at(image_idx) = workspace_->GetNormalMap(image_idx);
       }
     }
+    std::cout << "start process:" << std::endl;
   }
 
   problem.Print();

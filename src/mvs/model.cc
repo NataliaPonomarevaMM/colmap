@@ -295,7 +295,7 @@ bool Model::ReadFromBundlerPMVS(const std::string& path) {
   for (int image_idx = 0; image_idx < num_images; ++image_idx) {
     const std::string image_name = StringPrintf("%08d.jpg", image_idx);
     const std::string image_path = JoinPaths(path, "visualize", image_name);
-      const std::string segmented_image_path = JoinPaths(path, "segmented_images", image_name);
+    const std::string segmented_image_path = JoinPaths(path, "segmented_images", image_name);
 
     float K[9] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
     file >> K[0];
