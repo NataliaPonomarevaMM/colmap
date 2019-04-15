@@ -151,7 +151,6 @@ std::string Workspace::GetBitmapPath(const int image_idx) const {
 }
 
 std::string Workspace::GetSegmentedBitmapPath(const int image_idx) const {
-    std::cout << "get_path " << image_idx << "std::endl";
     return model_.images.at(image_idx).GetSegmentedPath();
 }
 

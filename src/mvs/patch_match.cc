@@ -466,7 +466,7 @@ void PatchMatchController::ProcessProblem(const PatchMatchOptions& options,
   }
 
   std::vector<Image> images = model.images;
-  std::vector<Bitmap> segmented_images;
+  std::vector<Bitmap> segmented_images = std::vector<Bitmap>(images.size());
   std::vector<DepthMap> depth_maps;
   std::vector<NormalMap> normal_maps;
   if (options.geom_consistency) {
@@ -496,13 +496,13 @@ void PatchMatchController::ProcessProblem(const PatchMatchOptions& options,
     std::cout << "Reading inputs..." << std::endl;
     std::cout << "To use segmented images: " << options.use_segmented_images << std::endl;
     std::cout << "Used images: " << used_image_idxs.size() << std::endl;
+    std::cout << "Segmented images size:" << segmented_images.size() << std::endl;
 
     for (const auto image_idx : used_image_idxs) {
-      std::cout << image_idx << std::endl;
-      std::cout << workspace_->GetSegmentedBitmapPath(image_idx) << std::endl;
+      std::cout << image_idx << workspace_->GetSegmentedBitmapPath(image_idx) << std::endl;
       images.at(image_idx).SetBitmap(workspace_->GetBitmap(image_idx));
       if (options.use_segmented_images) {
-          std::cout << workspace_->GetSegmentedBitmapPath(image_idx) << std::endl;
+          //std::cout << workspace_->GetSegmentedBitmapPath(image_idx) << std::endl;
           segmented_images.at(image_idx) = workspace_->GetSegmentedBitmap(image_idx);
       }
       if (options.geom_consistency) {
