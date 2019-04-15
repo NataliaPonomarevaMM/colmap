@@ -1473,6 +1473,11 @@ void PatchMatchCuda::InitRefImage() {
 
       ref_segmented_image_.reset(new GpuMat<uint8_t>(ref_width_, ref_height_));
       const std::vector<uint8_t> ref_segmented_image_array = ref_segmented_bitmap.ConvertToRowMajorArray();
+
+      std::cout << "ref_segmented_image_array_size:" << ref_segmented_image_array.size() << std::endl;
+      std::cout << "uint8_t" << sizeof(uint8_t) << std::endl;
+      std::cout << "pitch" << ref_segmented_image_->GetPitch() << std::endl;
+
       ref_segmented_image_->CopyToDevice(ref_segmented_image_array.data(),
                                          ref_segmented_image_array.size() * sizeof(uint8_t));
       ref_segmented_image_device_.reset(new CudaArrayWrapper<uint8_t>(ref_width_, ref_height_, 1));
