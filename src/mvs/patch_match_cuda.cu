@@ -1472,6 +1472,9 @@ void PatchMatchCuda::InitRefImage() {
       const Bitmap& ref_segmented_bitmap = problem_.segmented_images->at(problem_.ref_image_idx);
 
       ref_segmented_image_.reset(new GpuMat<uint8_t>(ref_width_, ref_height_));
+      std::cout << "_width: " << ref_segmented_image_->GetWidth() << " _height: " << ref_segmented_image_->GetHeight() << std::endl;
+      std::cout << "pitch" << ref_segmented_image_->GetPitch() << std::endl;
+
       std::cout << "ref_width: " << ref_width_ << " ref_height: " << ref_height_ << std::endl;
       std::cout << "seg_width: " << ref_segmented_bitmap.Width() << " seg_height: " << ref_segmented_bitmap.Height() << std::endl;
       std::cout << "channels: " << ref_segmented_bitmap.Channels() << std::endl;
@@ -1479,8 +1482,6 @@ void PatchMatchCuda::InitRefImage() {
       const std::vector<uint8_t> ref_segmented_image_array = ref_segmented_bitmap.ConvertToRowMajorArray();
 
       std::cout << "ref_segmented_image_array_size:" << ref_segmented_image_array.size() << std::endl;
-      std::cout << "uint8_t" << sizeof(uint8_t) << std::endl;
-      std::cout << "pitch" << ref_segmented_image_->GetPitch() << std::endl;
 
       ref_segmented_image_->CopyToDevice(ref_segmented_image_array.data(),
                                          ref_segmented_image_array.size() * sizeof(uint8_t));
