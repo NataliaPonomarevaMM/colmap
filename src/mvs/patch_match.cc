@@ -499,6 +499,7 @@ void PatchMatchController::ProcessProblem(const PatchMatchOptions& options,
 
     for (const auto image_idx : used_image_idxs) {
       std::cout << image_idx << std::endl;
+      std::cout << workspace_->GetSegmentedBitmapPath(image_idx) << std::endl;
       images.at(image_idx).SetBitmap(workspace_->GetBitmap(image_idx));
       if (options.use_segmented_images) {
           std::cout << workspace_->GetSegmentedBitmapPath(image_idx) << std::endl;

@@ -38,6 +38,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 
 #include "util/bitmap.h"
 
@@ -108,7 +109,10 @@ const Bitmap& Image::GetBitmap() const { return bitmap_; }
 
 const std::string& Image::GetPath() const { return path_; }
 
-const std::string& Image::GetSegmentedPath() const { return segmented_path_; }
+const std::string& Image::GetSegmentedPath() const {
+    std::cout << " segmented_path" << std::endl;
+    return segmented_path_;
+}
 
 const float* Image::GetR() const { return R_; }
 
