@@ -1471,6 +1471,11 @@ void PatchMatchCuda::InitRefImage() {
       // Upload segmented image
       const Bitmap& ref_segmented_bitmap = problem_.segmented_images->at(problem_.ref_image_idx);
 
+      uint8_t* array_ptr_;
+      size_t pitch_;
+      CUDA_SAFE_CALL(cudaMallocPitch((void**)&array_ptr_, &pitch_,
+                                   ref_width_, ref_height_));
+      std::cout << "my pitch: " << pitch_ << std::endl;
       ref_segmented_image_.reset(new GpuMat<uint8_t>(ref_width_, ref_height_));
       std::cout << "_width: " << ref_segmented_image_->GetWidth() << " _height: " << ref_segmented_image_->GetHeight() << std::endl;
       std::cout << "pitch" << ref_segmented_image_->GetPitch() << std::endl;
