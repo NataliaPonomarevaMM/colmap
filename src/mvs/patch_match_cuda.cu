@@ -1451,6 +1451,7 @@ void PatchMatchCuda::InitRefImage() {
   ref_image_.reset(new GpuMatRefImage(ref_width_, ref_height_));
   const std::vector<uint8_t> ref_image_array =
       ref_image.GetBitmap().ConvertToRowMajorArray();
+  std::cout << "ref_image_pitch: " << ref_image_->image->GetPitch() << std::endl;
   ref_image_->Filter(ref_image_array.data(), options_.window_radius,
                      options_.window_step, options_.sigma_spatial,
                      options_.sigma_color);
@@ -1471,11 +1472,6 @@ void PatchMatchCuda::InitRefImage() {
       // Upload segmented image
       const Bitmap& ref_segmented_bitmap = problem_.segmented_images->at(problem_.ref_image_idx);
 
-      uint8_t* array_ptr_;
-      size_t pitch_;
-      CUDA_SAFE_CALL(cudaMallocPitch((void**)&array_ptr_, &pitch_,
-                                   ref_width_, ref_height_));
-      std::cout << "my pitch: " << pitch_ << std::endl;
       ref_segmented_image_.reset(new GpuMat<uint8_t>(ref_width_, ref_height_));
       std::cout << "_width: " << ref_segmented_image_->GetWidth() << " _height: " << ref_segmented_image_->GetHeight() << std::endl;
       std::cout << "pitch" << ref_segmented_image_->GetPitch() << std::endl;
@@ -1488,8 +1484,8 @@ void PatchMatchCuda::InitRefImage() {
 
       std::cout << "ref_segmented_image_array_size:" << ref_segmented_image_array.size() << std::endl;
 
-      ref_segmented_image_->CopyToDevice(ref_segmented_image_array.data(),
-                                         ref_segmented_image_array.size() * sizeof(uint8_t));
+      ref_segmented_image_->CopyToDevice(ref_segmented_image_array.data(), ref_segmented_bitmap.Height());
+                                         //ref_segmented_image_array.size());
       ref_segmented_image_device_.reset(new CudaArrayWrapper<uint8_t>(ref_width_, ref_height_, 1));
       ref_segmented_image_device_->CopyFromGpuMat(*ref_segmented_image_);
       // Create texture for segmented image.
